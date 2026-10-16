@@ -157,6 +157,29 @@ describe('Message Operations', () => {
     };
   });
 
+  it('preserves task provenance and the original instruction through client message reads', async () => {
+    const scheduleRun = {
+      scheduleId: 'task-1',
+      name: 'Daily report',
+      manual: false,
+      scheduledFor: '2026-10-16T10:00:00.000Z',
+    };
+    await saveMessage(mockCtx, { ...mockMessageData, scheduleRun, isCreatedByUser: true });
+    const rows = await getMessages(
+      { conversationId: mockMessageData.conversationId },
+      CLIENT_MESSAGE_SELECT,
+    );
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          scheduleRun,
+          text: mockMessageData.text,
+          isCreatedByUser: true,
+        }),
+      ]),
+    );
+  });
+
   const appAttachment = (i: number, bytes: number, toolCallId = 'call_bg') => ({
     type: Tools.ui_resources,
     file_id: `app-${i}`,

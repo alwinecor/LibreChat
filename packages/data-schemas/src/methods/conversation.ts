@@ -642,6 +642,7 @@ export interface ConversationMethods {
 
 export interface ConversationMethodDeps
   extends Pick<MessageMethods, 'getMessages' | 'deleteMessages'> {
+  retireScheduleConversations?: (user: string, conversationIds: string[]) => Promise<void>;
   searchMessages?: MessageMethods['searchMessages'];
   deleteAgentQueuedTurns?: (
     user: string,
@@ -4044,6 +4045,7 @@ export function createConversationMethods(
         );
         await options?.beforeDelete?.(waveIds);
         await deps?.prepareAgentTriggerConversationResultErasure?.(user, waveIds);
+        await deps?.retireScheduleConversations?.(user, waveIds);
         const result = await Conversation.deleteMany({ user, conversationId: { $in: waveIds } });
         if (result.deletedCount > 0) {
           /** Result erasure is irreversible. Keep receipts intact when a
@@ -4078,6 +4080,7 @@ export function createConversationMethods(
       ];
 
       if (recoveryConversationIds.length > 0) {
+        await deps?.retireScheduleConversations?.(user, recoveryConversationIds);
         await deps?.deleteAgentQueuedTurns?.(
           user,
           recoveryConversationIds.map((conversationId) => ({

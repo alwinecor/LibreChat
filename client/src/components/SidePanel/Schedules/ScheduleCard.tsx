@@ -59,6 +59,10 @@ const DISABLED_REASON_LABELS: Record<ScheduleDisabledReason, TranslationKeys> = 
   insufficient_balance: 'com_ui_schedule_disabled_insufficient_balance',
   project_deleted: 'com_ui_schedule_disabled_project_deleted',
   project_required: 'com_ui_schedule_disabled_project_required',
+  conversation_deleted: 'com_ui_schedule_conversation_deleted',
+  conversation_conflict: 'com_ui_schedule_conversation_conflict',
+  conversation_project_conflict: 'com_ui_schedule_conversation_project_conflict',
+  continuation_disabled: 'com_ui_schedule_continuation_disabled',
 };
 
 const TRAILING_TONE: Record<ScheduleRowTone, string> = {
@@ -227,8 +231,15 @@ export default function ScheduleCard({ schedule, projectName, consentEnabled }: 
   const handleRunNow = useCallback(() => {
     setImmediateMCPFailure(null);
     runSchedule.mutate(schedule.id, {
-      onSuccess: () => {
-        showToast({ message: localize('com_ui_schedule_run_now_started'), status: 'success' });
+      onSuccess: (result) => {
+        showToast({
+          message: localize(
+            result.status === 'waiting'
+              ? 'com_ui_schedule_waiting'
+              : 'com_ui_schedule_run_now_started',
+          ),
+          status: 'success',
+        });
         setMenuOpen(false);
       },
       onError: (error) => {
@@ -333,7 +344,7 @@ export default function ScheduleCard({ schedule, projectName, consentEnabled }: 
     [localize, handleRunNow, runSchedule.isLoading, canInspectConsent, canWrite],
   );
 
-  const lastRunConvoId = schedule.lastRun?.conversationId;
+  const lastRunConvoId = schedule.conversationId ?? schedule.lastRun?.conversationId;
 
   /** One state per row, derived once so the marker and the word cannot disagree. */
   const rowState = useMemo(() => scheduleRowState(schedule, localize), [schedule, localize]);

@@ -487,6 +487,7 @@ async function finalizeResumedTurn({
   const stepLimitReached = client?.stepLimitReached === true;
 
   const responseMessage = {
+    scheduleRun: userMessage?.scheduleRun,
     messageId: responseMessageId,
     parentMessageId,
     conversationId,

@@ -357,7 +357,9 @@ export function createMethods(
       }),
   });
 
+  const scheduleMethods = createScheduleMethods(mongoose);
   const conversationMethods = createConversationMethods(mongoose, {
+    retireScheduleConversations: scheduleMethods.retireScheduleConversations,
     getMessages: messageMethods.getMessages,
     deleteMessages: messageMethods.deleteMessages,
     searchMessages: messageMethods.searchMessages,
@@ -531,7 +533,7 @@ export function createMethods(
     ...createSkillSyncMethods(mongoose),
     ...agentTriggerDeliveryMethods,
     ...agentQueuedTurnMethods,
-    ...createScheduleMethods(mongoose),
+    ...scheduleMethods,
     ...createScheduleMCPConsentStorage(mongoose),
     /* Tier 5 */
     ...agentMethods,

@@ -49,6 +49,7 @@ import { isShutdownInProgress, getShutdownSignal } from '../app/shutdown';
 import { scheduleMCPFailurePriority } from '~/stream/scheduleFailure';
 import { fireSchedule, BALANCE_SKIP_DISABLE_THRESHOLD } from './fire';
 import { GenerationJobManager } from '../stream/GenerationJobManager';
+import { createScheduleContinuationResolver } from './continuation';
 import { ScheduledMCPPolicyError } from './authorization/policy';
 import { buildBalanceUpdateFields } from '../middleware/balance';
 import { getAppConfigOptionsFromUser } from '../app/service';
@@ -214,6 +215,7 @@ export interface SchedulesServiceDeps {
 }
 
 export interface SchedulesService {
+  prepareScheduleContinuation: ReturnType<typeof createScheduleContinuationResolver>;
   getLimits: (user?: ScheduleUserContext) => Promise<ScheduleLimits>;
   engineDeps: ScheduleEngineDeps;
   fireScheduleNow: (
@@ -547,6 +549,7 @@ export function createScheduleLimitsResolver(
     const projectId = config.projectId?.trim() || undefined;
     return {
       enabled: config.use !== false,
+      continueConversation: config.continueConversation === true,
       ...(config.mcpConsent && {
         mcpConsent: {
           enabled: config.mcpConsent.enabled === true,
@@ -1603,6 +1606,17 @@ export function createSchedulesService(
         const schedule = await methods.getScheduleById(scheduleId);
         const owner = schedule ? await engineDeps.getUserContext(schedule.user) : null;
         const limits = await getLimits(owner ?? undefined);
+        if (schedule?.target === 'same' && conversationId && owner) {
+          await methods.markScheduleConversationMaterialized(
+            {
+              scheduleId,
+              userId: owner.id,
+              tenantId: owner.tenantId,
+              configRevision: schedule.configRevision ?? 0,
+            },
+            conversationId,
+          );
+        }
         await methods.recordRunOutcome({
           scheduleId,
           scheduledFor: new Date(scheduledFor),
@@ -1782,7 +1796,7 @@ export function createSchedulesService(
         return false;
       }
       const limits = await engineDeps.runInTenantContext(owner, () => getLimits(owner));
-      if (!limits.enabled) {
+      if (!limits.enabled || (schedule.target === 'same' && limits.continueConversation !== true)) {
         return false;
       }
       if (!(await engineDeps.hasScheduleAccess(owner))) {
@@ -2471,6 +2485,10 @@ export function createSchedulesService(
   return {
     getLimits,
     engineDeps,
+    prepareScheduleContinuation: createScheduleContinuationResolver({
+      ...engineDeps,
+      isScheduleLive,
+    }),
     fireScheduleNow,
     recordScheduleOutcome,
     recordMCPToolAuthFailure,

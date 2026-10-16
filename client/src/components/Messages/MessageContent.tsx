@@ -30,7 +30,7 @@ function MessageContent(props: TMessageProps) {
   const { chatContext, effectiveIsSubmitting, latestMessageId, latestMessageDepth } =
     useMemoizedChatContext(message, isSubmitting);
 
-  if (!message || typeof message !== 'object') {
+  if (!message || typeof message !== 'object' || (message.isCreatedByUser && message.scheduleRun)) {
     return null;
   }
 

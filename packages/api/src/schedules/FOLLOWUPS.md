@@ -5,8 +5,27 @@ Scheduled chats remain experimental and default-off.
 ## Must-have product follow-ups
 
 - Add one-time and monthly schedules; current cadences are hourly, daily, weekdays, and weekly.
-- Add non-agent chat targets and existing-conversation continuation; current schedules require
-  `agent_id` and always target `new`.
+- Add non-agent chat targets and binding to a user-selected existing conversation. Persistent
+  schedules currently create their own dedicated conversation on the first run.
+
+## Persistent conversations
+
+Enable `interface.schedules.continueConversation: true` to offer **Continue the same conversation**.
+The default remains a new conversation per run. Persistent runs include previous turns and manual
+replies, through the normal message-loading and compaction path; longer history can cost more tokens.
+No OpenAI-hosted conversation storage or new provider dependency is required.
+
+A busy conversation holds at most one waiting occurrence per schedule, without holding a generation
+capacity slot. Additional automatic ticks skip; another Run Now returns a conflict. Pausing or editing
+the schedule fences waiting work using the configuration revision. Once allocated, the conversation,
+agent and project are fixed. Prompt and cadence remain editable. Ambiguous branches, failed or
+unfinished final messages, a deleted conversation, or a changed project pin stop automatic continuation
+instead of silently choosing another branch or recreating the conversation. Deleting the schedule
+keeps its conversation.
+
+Deploy compatible code to every replica before enabling the flag. Keep the existing shared-store /
+single-process topology requirements. Before rolling back, disable the flag, pause persistent schedules,
+and drain their waiting/running occurrences; older replicas cannot process persistent targets safely.
 
 ## Client/API parity
 

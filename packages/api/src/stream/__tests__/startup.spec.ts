@@ -740,6 +740,48 @@ describe('GenerationJobManager startup telemetry', () => {
     }
   });
 
+  it('keeps task provenance from created events through stopped replies', async () => {
+    const manager = createManager();
+    const streamId = 'scheduled-stop';
+    const scheduleRun = {
+      scheduleId: 'task',
+      name: 'Daily report',
+      manual: true,
+      scheduledFor: '2026-10-16T10:00:00.000Z',
+    };
+    const job = await manager.createJob(streamId, 'owner', streamId, {
+      initialMetadata: { responseMessageId: 'reply' },
+    });
+    try {
+      await manager.emitChunk(
+        streamId,
+        {
+          created: true,
+          streamId,
+          message: {
+            messageId: 'prompt',
+            conversationId: streamId,
+            sender: 'User',
+            text: 'Original instruction',
+            isCreatedByUser: true,
+            scheduleRun,
+          },
+        },
+        { expectedCreatedAt: job.createdAt },
+      );
+      expect((await manager.getResumeState(streamId))?.userMessage?.scheduleRun).toEqual(
+        scheduleRun,
+      );
+      const result = await manager.abortJob(streamId, { expectedCreatedAt: job.createdAt });
+      expect(result.finalEvent).toMatchObject({
+        requestMessage: { scheduleRun },
+        responseMessage: { scheduleRun },
+      });
+    } finally {
+      await manager.destroy();
+    }
+  });
+
   it('ends an active startup when the manager shuts down', async () => {
     const manager = createManager();
     const telemetry = createTelemetry();

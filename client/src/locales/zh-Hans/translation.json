@@ -3064,5 +3064,21 @@
   "com_ui_zoom_in": "放大",
   "com_ui_zoom_level": "缩放级别",
   "com_ui_zoom_out": "缩小",
-  "com_user_message": "您"
+  "com_user_message": "您",
+  "com_ui_schedule_run_automatic": "定时任务",
+  "com_ui_schedule_run_manual": "任务手动运行",
+  "com_ui_schedule_run_name": "任务名称",
+  "com_ui_schedule_run_time": "本次触发时间",
+  "com_ui_schedule_run_instruction": "本次执行指令",
+  "com_ui_schedule_run_unavailable": "无法获取本次执行的指令。",
+  "com_ui_schedule_target": "对话模式",
+  "com_ui_schedule_target_new": "每次执行创建新对话",
+  "com_ui_schedule_target_same": "在同一对话中继续",
+  "com_ui_schedule_target_same_hint": "首次执行会创建专用对话。后续执行会包含该对话的历史记录和你的回复；对话忙碌时会等待。较长的历史记录可能消耗更多令牌。",
+  "com_ui_schedule_binding_locked": "此任务已绑定到对话。如需更改智能体、项目或对话模式，请创建新任务。",
+  "com_ui_schedule_waiting": "等待继续执行",
+  "com_ui_schedule_continuation_disabled": "定时任务续聊功能已禁用。你可以暂停此任务，或联系管理员启用该功能。",
+  "com_ui_schedule_conversation_deleted": "对话已被删除。请创建新任务以开始另一段对话。",
+  "com_ui_schedule_conversation_conflict": "对话存在无法确定或不完整的分支。请创建新任务以安全继续。",
+  "com_ui_schedule_conversation_project_conflict": "对话所属的项目已与此任务不一致。请恢复原项目，或创建新任务。"
 }

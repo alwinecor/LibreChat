@@ -23,6 +23,7 @@ import MessageIcon from '~/components/Chat/Messages/MessageIcon';
 import Wakeup from '~/components/Chat/Messages/Content/Wakeup';
 import SubRow from '~/components/Chat/Messages/SubRow';
 import { MessageContext } from '~/Providers';
+import ScheduleBadge from './ScheduleBadge';
 import WakeupRow from './WakeupRow';
 import store from '~/store';
 
@@ -164,6 +165,7 @@ const MessageRender = memo(function MessageRender({
 
   return (
     <Row
+      accessory={msg.scheduleRun && !msg.isCreatedByUser ? <ScheduleBadge message={msg} /> : null}
       task={subagentWakeup}
       conversationId={msg.conversationId ?? conversation?.conversationId ?? ''}
       id={msg.messageId}

@@ -10,6 +10,8 @@ const {
 const {
   toPendingSteer,
   persistedReasoningOverrideFields,
+  scheduledMessageFields,
+  stampScheduledMessage,
   getViolationInfo,
   applyForcedTemporaryRequest,
   resolveResumableRetention,
@@ -17,6 +19,7 @@ const {
   getReferencedQuotes,
   resolveTitleTiming,
   GenerationJobManager,
+  drainScheduledProvider,
   createConvoPersistenceSignal,
   recoverTurnMessageReference,
   filterPersistableAbortContent,
@@ -434,6 +437,7 @@ async function saveErrorTurn(
         liveUserMessage != null
           ? {
               ...liveUserMessage,
+              ...scheduledMessageFields(req),
               ...(liveUserMessage.files == null &&
                 Array.isArray(req.body?.files) &&
                 req.body.files.length > 0 && { files: req.body.files }),
@@ -446,7 +450,10 @@ async function saveErrorTurn(
                   alwaysAppliedSkills: req.body.alwaysAppliedSkills,
                 }),
             }
-          : getPreliminaryUserMessage(req.body, conversationId, req._agentEventTriggerProjection);
+          : stampScheduledMessage(
+              req,
+              getPreliminaryUserMessage(req.body, conversationId, req._agentEventTriggerProjection),
+            );
       if (!userMessage) {
         return;
       }
@@ -532,6 +539,7 @@ async function saveErrorTurn(
       reqCtx,
       {
         ...langfuseTraceFields,
+        ...scheduledMessageFields(req),
         messageId: errorMessageId,
         conversationId,
         parentMessageId: errorParentMessageId,
@@ -1677,10 +1685,13 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
       ? projectCompactionAnchor({ messageId: parentMessageId, conversationId })
       : stampPreliminaryPrivateTextMessage(
           req,
-          getPreliminaryUserMessage(
-            { ...req.body, messageId: preallocatedUserMessageId },
-            conversationId,
-            req._agentEventTriggerProjection,
+          stampScheduledMessage(
+            req,
+            getPreliminaryUserMessage(
+              { ...req.body, messageId: preallocatedUserMessageId },
+              conversationId,
+              req._agentEventTriggerProjection,
+            ),
           ),
         );
     const job = await GenerationJobManager.createJob(streamId, userId, conversationId, {
@@ -1965,6 +1976,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
 
       try {
         const partialMessage = {
+          ...scheduledMessageFields(req),
           messageId: resumeState.responseMessageId || `${resumeState.userMessage.messageId}_`,
           conversationId: responseConversationId,
           parentMessageId: resumeState.userMessage.messageId,
@@ -2091,7 +2103,9 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
         }
         client = null;
         if (providerExecutionId) {
-          await GenerationJobManager.markProviderExecutionDrained?.(
+          await drainScheduledProvider(
+            GenerationJobManager,
+            recordScheduleOutcome,
             streamId,
             jobCreatedAt,
             providerExecutionId,
@@ -2391,6 +2405,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
                 quotes: userMsg.quotes,
                 privacyRevision: userMsg.privacyRevision,
                 reasoningOverride: userMsg.reasoningOverride,
+                scheduleRun: userMsg.scheduleRun,
                 // Persist the turn's uploaded files here (authoritative job metadata) so a
                 // HITL resume sources them from the job, not the user DB row — which the
                 // approval prompt can race (the row save may still be in flight when a fast
@@ -3504,7 +3519,9 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
       .finally(async () => {
         await Promise.allSettled([immediateTitlePromise, trailingWritePromise].filter(Boolean));
         if (providerExecutionId) {
-          await GenerationJobManager.markProviderExecutionDrained?.(
+          await drainScheduledProvider(
+            GenerationJobManager,
+            recordScheduleOutcome,
             streamId,
             jobCreatedAt,
             providerExecutionId,
@@ -3661,7 +3678,9 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
       disposeClient(client);
     }
     if (jobCreatedAt != null && providerExecutionId) {
-      await GenerationJobManager.markProviderExecutionDrained?.(
+      await drainScheduledProvider(
+        GenerationJobManager,
+        recordScheduleOutcome,
         streamId,
         jobCreatedAt,
         providerExecutionId,

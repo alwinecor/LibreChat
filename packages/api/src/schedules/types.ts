@@ -11,6 +11,7 @@ import type { AgentTriggerEnqueueOptions, AgentTriggerEnvelope } from '../agents
 import type { SlotClaimResult } from './capacity';
 
 export interface ScheduleLimits {
+  continueConversation?: boolean;
   /** Feature-level switch: when false the engine claims/fires nothing. */
   enabled: boolean;
   mcpConsent?: { enabled: boolean; maxLifetimeHours: number };
@@ -34,6 +35,7 @@ export interface ScheduleLimits {
 }
 
 export const DEFAULT_SCHEDULE_LIMITS: ScheduleLimits = {
+  continueConversation: false,
   enabled: true,
   maxPerUser: 10,
   minIntervalMinutes: 60,
@@ -314,6 +316,7 @@ export interface JobState {
 }
 
 export interface FireResult {
+  waiting?: boolean;
   mcp?: ScheduleMCPOutcome[];
   mcpPreflightUnavailable?: boolean;
   fired: boolean;

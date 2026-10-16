@@ -14,6 +14,12 @@ const schedule = (
 });
 
 describe('scheduleRowState', () => {
+  it('shows a waiting occurrence separately from the previous result', () => {
+    expect(scheduleRowState(schedule({ waiting: true }), localize)).toEqual({
+      tone: 'running',
+      label: 'com_ui_schedule_waiting',
+    });
+  });
   it('says nothing while the clock is in charge', () => {
     /** A running schedule's row shows when the next run lands, so a label here would
      *  take that slot and say less. */

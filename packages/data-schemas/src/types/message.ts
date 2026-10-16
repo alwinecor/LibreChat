@@ -2,6 +2,7 @@ import type {
   TFeedbackRating,
   TFeedbackTag,
   TReasoningOverride,
+  TMessage,
   UserSubmittedMessageFieldPath,
 } from 'librechat-data-provider';
 import type { Document } from 'mongoose';
@@ -63,6 +64,7 @@ export interface IMessage extends Document {
   /** Authenticated ciphertext, available only through the owner-view read. */
   privateText?: string;
   privacyRevision?: string;
+  scheduleRun?: TMessage['scheduleRun'];
   privateTextTokens?: string[];
   isCreatedByUser: boolean;
   /** True when the complete stored row came from outside the model. */

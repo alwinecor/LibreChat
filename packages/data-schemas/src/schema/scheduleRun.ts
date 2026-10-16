@@ -30,6 +30,12 @@ const scheduleRunSchema: Schema<IScheduleRunDocument> = new Schema(
     conversationId: {
       type: String,
     },
+    waiting: { type: Boolean },
+    manual: { type: Boolean },
+    dispatchStarted: { type: Boolean },
+    predecessorCreatedAt: { type: Number },
+    continuationParentMessageId: { type: String },
+    generationCreatedAt: { type: Number },
     checkpointNamespace: {
       type: String,
       select: false,

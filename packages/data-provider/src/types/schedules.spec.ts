@@ -1,10 +1,41 @@
 import { z } from 'zod';
 import {
+  createSchedulePayloadSchema,
+  updateSchedulePayloadSchema,
   getScheduleMCPDisabledReason,
   isScheduleMCPAuthorizationFailure,
   readScheduleMCPOutcomes,
   scheduleMCPOutcomeSchema,
 } from './schedules';
+
+describe('persistent schedule requests', () => {
+  const payload = {
+    name: 'Daily report',
+    prompt: 'Continue the report',
+    agent_id: 'agent_report',
+    cadence: { frequency: 'daily', hour: 9, minute: 0 },
+    timezone: 'Europe/Berlin',
+    clientRequestId: 'create-report',
+  };
+
+  it('preserves new-conversation defaults and accepts explicitly requested persistence', () => {
+    expect(createSchedulePayloadSchema.parse(payload).target).toBe('new');
+    expect(createSchedulePayloadSchema.parse({ ...payload, target: 'same' }).target).toBe('same');
+    expect(createSchedulePayloadSchema.safeParse({ ...payload, target: 'other' }).success).toBe(
+      false,
+    );
+  });
+
+  it.each(['binding', 'conversationId', 'parentMessageId'])(
+    'rejects client-owned %s on create and update',
+    (key) => {
+      expect(createSchedulePayloadSchema.safeParse({ ...payload, [key]: 'forged' }).success).toBe(
+        false,
+      );
+      expect(updateSchedulePayloadSchema.safeParse({ [key]: 'forged' }).success).toBe(false);
+    },
+  );
+});
 
 it('preserves the previous wire status while providing an optional unattended-auth diagnosis', () => {
   const outcome = {

@@ -54,6 +54,35 @@ describe('buildCreatedInitialResponse', () => {
     );
   });
 
+  it('labels the streaming reply from the server-created task prompt', () => {
+    const scheduleRun = {
+      scheduleId: 'task',
+      manual: true,
+      scheduledFor: '2026-10-16T10:00:00.000Z',
+    };
+    expect(
+      buildCreatedInitialResponse({
+        initialResponse,
+        userMessage: { ...userMessage, scheduleRun },
+        isRegenerate: false,
+      }).scheduleRun,
+    ).toEqual(scheduleRun);
+    expect(
+      buildCreatedInitialResponse({
+        initialResponse: { ...initialResponse, scheduleRun },
+        userMessage,
+        isRegenerate: false,
+      }).scheduleRun,
+    ).toBeUndefined();
+    expect(
+      buildCreatedInitialResponse({
+        initialResponse,
+        userMessage: { ...userMessage, scheduleRun },
+        isRegenerate: true,
+      }).scheduleRun,
+    ).toBeUndefined();
+  });
+
   it('preserves the regenerated prelim response id and parent', () => {
     expect(
       buildCreatedInitialResponse({

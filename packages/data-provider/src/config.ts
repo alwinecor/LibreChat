@@ -2812,6 +2812,8 @@ export const interfaceSchema = z
         z.object({
           use: z.boolean().optional(),
           create: z.boolean().optional(),
+          /** Opt in to schedules that reuse their dedicated conversation. */
+          continueConversation: z.boolean().optional(),
           maxPerUser: z.number().int().min(0).optional(),
           minIntervalMinutes: z.number().int().min(1).optional(),
           autoDisableAfterFailures: z.number().int().min(1).optional(),

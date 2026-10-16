@@ -826,6 +826,7 @@ router.post('/chat/abort', chatConfigMiddleware, async (req, res, next) => {
               user: userId,
             };
             const responseMessage = {
+              scheduleRun: jobData.userMessage.scheduleRun,
               messageId: jobData.responseMessageId,
               parentMessageId: jobData.userMessage.messageId,
               conversationId: jobData.conversationId,

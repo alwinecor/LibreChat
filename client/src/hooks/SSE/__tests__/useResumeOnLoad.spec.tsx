@@ -214,6 +214,38 @@ function renderUseResumeOnLoad({
 beforeEach(() => resetQueueFamilies());
 
 describe('useResumeOnLoad', () => {
+  it('restores task provenance on both rows before a missing transcript arrives', async () => {
+    const observedSubmissions: Array<TSubmission | null> = [];
+    const scheduleRun = {
+      scheduleId: 'task',
+      name: 'Daily report',
+      manual: false,
+      scheduledFor: '2026-10-16T10:00:00.000Z',
+    };
+    mockUseStreamStatus.mockReturnValue({
+      isSuccess: true,
+      isFetching: false,
+      data: {
+        active: true,
+        status: 'running',
+        streamId: CONVERSATION_ID,
+        resumeState: {
+          runSteps: [],
+          aggregatedContent: [],
+          conversationId: CONVERSATION_ID,
+          responseMessageId: RESPONSE_MESSAGE_ID,
+          userMessage: { ...buildUserMessage(), scheduleRun },
+        },
+      },
+    });
+    renderUseResumeOnLoad({ onSubmission: (submission) => observedSubmissions.push(submission) });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const submission = observedSubmissions.at(-1);
+    expect(submission?.userMessage.scheduleRun).toEqual(scheduleRun);
+    expect(submission?.initialResponse?.scheduleRun).toEqual(scheduleRun);
+  });
   beforeEach(() => {
     jest.spyOn(console, 'log').mockImplementation(() => undefined);
     mockUseStreamStatus.mockReset();

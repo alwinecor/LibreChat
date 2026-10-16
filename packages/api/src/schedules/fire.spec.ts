@@ -266,6 +266,54 @@ describe('buildFireClientRequestId', () => {
 });
 
 describe('fireSchedule', () => {
+  it('queues an existing persistent conversation without a capacity slot', async () => {
+    const { methods } = makeMethods();
+    const deps = makeDeps(methods, {
+      getLimits: async () => ({ ...LIMITS, continueConversation: true }),
+    });
+    deps.methods = {
+      ...deps.methods,
+      reserveScheduleConversation: async () => ({
+        conversationId: 'persistent',
+        materialized: true,
+        revision: 0,
+      }),
+      resolveScheduleConversationBranch: async () => ({
+        status: 'ready',
+        conversationId: 'persistent',
+        parentMessageId: 'answer',
+        bindingRevision: 0,
+      }),
+      getActiveRunsForSchedule: async () => [],
+    };
+    const result = await fireSchedule(
+      deps,
+      makeSchedule({ target: 'same' }),
+      { ...LIMITS, continueConversation: true },
+      dueAt(),
+    );
+    expect(result).toMatchObject({ fired: true, waiting: true, conversationId: 'persistent' });
+    expect(methods.reserveStartedRun).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationId: 'persistent', waiting: true }),
+    );
+    expect(methods.reserveStartedRun.mock.calls[0][0].capacitySlot).toBeUndefined();
+    expect(deps.enqueueTrigger).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'continue',
+        target: expect.objectContaining({ conversationId: 'persistent' }),
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('refuses persistent mode when the feature is unavailable', async () => {
+    const { methods } = makeMethods();
+    const deps = makeDeps(methods);
+    const result = await fireSchedule(deps, makeSchedule({ target: 'same' }), LIMITS, dueAt());
+    expect(result.fired).toBe(false);
+    expect(deps.enqueueTrigger).not.toHaveBeenCalled();
+  });
+
   it('preserves a claimed occurrence when the deployment switch turns off', async () => {
     const { methods } = makeMethods();
     const getLimits = jest.fn(async () => ({ ...LIMITS, enabled: false }));

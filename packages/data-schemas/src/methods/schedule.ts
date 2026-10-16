@@ -15,6 +15,8 @@ import type {
   IScheduleRun,
   IScheduleRunDocument,
 } from '~/types/schedule';
+import type { ScheduleBindingMethods } from './scheduleBinding';
+import { createScheduleBindingMethods } from './scheduleBinding';
 import { tenantSafeBulkWrite } from '~/utils/tenantBulkWrite';
 import { createIndexesWithRetry } from '~/utils/retry';
 
@@ -188,7 +190,7 @@ export type ResumedRunReservation =
   | { capacitySlot: number }
   | { conflict: 'not-paused' | 'overlap' | 'slot-taken' };
 
-export type ScheduleMethods = {
+export type ScheduleMethods = ScheduleBindingMethods & {
   /** Resolves live state only for a task's captured schedule identity. */
   getScheduleMCPCompletionState: (
     identity: ScheduledMCPIdentity,
@@ -459,10 +461,18 @@ export function createScheduleMethods(mongoose: typeof import('mongoose')): Sche
         Object.keys(unset ?? {}).some((key) => key !== 'disabledReason'))
     )
       throw new Error('Consent continuity is limited to activation state');
+    // A binding can be allocated after the HTTP handler's read. Fence the identity
+    // in this write as well so the first dispatch and an owner edit cannot cross.
+    const bindingIdentity = ['agent_id', 'target', 'chatProjectId'].flatMap((field) => {
+      const value = update[field as 'agent_id' | 'target' | 'chatProjectId'];
+      if (value === undefined && unset?.[field] == null) return [];
+      return [{ $or: [{ binding: { $exists: false } }, { [field]: value ?? null }] }];
+    });
     const filter = {
       id,
       user: userId,
       deleting: { $ne: true },
+      ...(bindingIdentity.length > 0 && { $and: bindingIdentity }),
       ...(preserveConsent && {
         'mcpConsent.version': 1,
         'mcpConsent.revision': options!.preserveMCPConsentRevision,
@@ -983,7 +993,7 @@ export function createScheduleMethods(mongoose: typeof import('mongoose')): Sche
    *  Admission-only rows never dispatched and are excluded even if settlement crashed. */
   async function getCapacityOccupancy(): Promise<{ takenSlots: number[]; unslotted: number }> {
     const rows = await ScheduleRun()
-      .find({ status: 'started', admissionOnly: { $ne: true } })
+      .find({ status: 'started', admissionOnly: { $ne: true }, waiting: { $ne: true } })
       .select('capacitySlot')
       .lean<Array<{ capacitySlot?: number }>>();
     const takenSlots: number[] = [];
@@ -1226,7 +1236,7 @@ export function createScheduleMethods(mongoose: typeof import('mongoose')): Sche
 
   /** Count of in-flight scheduled runs (across all schedules) for the fire cap. */
   async function countActiveRuns(): Promise<number> {
-    return ScheduleRun().countDocuments({ status: 'started' });
+    return ScheduleRun().countDocuments({ status: 'started', waiting: { $ne: true } });
   }
 
   /**
@@ -2311,6 +2321,7 @@ export function createScheduleMethods(mongoose: typeof import('mongoose')): Sche
   }
 
   return {
+    ...createScheduleBindingMethods(mongoose),
     ensureScheduleIndexes,
     createSchedule,
     createScheduleWithSlot,

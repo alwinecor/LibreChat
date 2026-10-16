@@ -43,6 +43,31 @@ function fullScheduleDoc(overrides: Partial<ISchedule> = {}): ISchedule {
 }
 
 describe('toWireSchedule', () => {
+  it('exposes a materialized persistent conversation and waiting without false generation activity', () => {
+    const schedule = fullScheduleDoc({
+      target: 'same',
+      binding: { conversationId: 'bound', materialized: true, revision: 0 },
+    });
+    const wire = toWireSchedule(schedule, undefined, [
+      {
+        scheduleId: schedule.id,
+        user: schedule.user,
+        scheduledFor: new Date(),
+        status: 'started',
+        conversationId: 'bound',
+        waiting: true,
+      },
+    ]);
+    expect(wire).toMatchObject({ conversationId: 'bound', waiting: true });
+    expect(wire.inFlight).toBeUndefined();
+    expect(wire).not.toHaveProperty('binding');
+    expect(toWireSchedule(schedule, { projectId: 'new-pin' }).chatProjectId).toBe(
+      schedule.chatProjectId,
+    );
+    expect(
+      toWireSchedule({ ...schedule, binding: { ...schedule.binding!, materialized: false } }),
+    ).not.toHaveProperty('conversationId');
+  });
   const INTERNAL_FIELDS = [
     '_id',
     '__v',
@@ -213,6 +238,16 @@ function makeCreateDeps(over: Partial<SchedulesHandlersDeps> = {}): SchedulesHan
 }
 
 describe('createSchedule late-create compensation', () => {
+  it('rejects a new persistent schedule when continuation is disabled', async () => {
+    const deps = makeCreateDeps({ isUserDeleting: async () => false });
+    const req = makeCreateReq();
+    Object.assign(req.body, { target: 'same' });
+    const { res, captured } = makeRes();
+    await createSchedulesHandlers(deps).createSchedule(req, res);
+    expect(captured.status).toBe(403);
+    expect(captured.body).toMatchObject({ code: 'SCHEDULE_CONTINUATION_DISABLED' });
+    expect(deps.methods.createScheduleWithSlot).not.toHaveBeenCalled();
+  });
   it('answers 410 when the guarded delete removes the unarmed revision', async () => {
     const deps = makeCreateDeps();
     const { res, captured } = makeRes();
@@ -971,6 +1006,23 @@ describe('updateSchedule client revision fence', () => {
       body,
       user: { id: 'user-1', tenantId: 't1', role: 'USER' },
     }) as unknown as ServerRequest;
+
+  it.each([{ target: 'new' }, { agent_id: 'another-agent' }, { chatProjectId: 'another-project' }])(
+    'preserves an allocated binding for %j',
+    async (body) => {
+      const deps = makeCreateDeps({ isUserDeleting: async () => false });
+      (deps.methods.getScheduleById as jest.Mock).mockResolvedValue({
+        ...existingRow(),
+        target: 'same',
+        binding: { conversationId: 'bound', materialized: false, revision: 0 },
+      });
+      const { res, captured } = makeRes();
+      await createSchedulesHandlers(deps).updateSchedule(makePatchReq(body), res);
+      expect(captured.status).toBe(409);
+      expect(captured.body).toMatchObject({ code: 'SCHEDULE_BINDING_IMMUTABLE' });
+      expect(deps.methods.updateScheduleById).not.toHaveBeenCalled();
+    },
+  );
 
   it('refuses a PATCH computed from a superseded revision', async () => {
     const deps = makeCreateDeps({ isUserDeleting: jest.fn(async () => false) });

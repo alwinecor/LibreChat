@@ -947,6 +947,14 @@ export const tMessageSchema = z.object({
   isCreatedByUser: z.boolean(),
   /** Opaque revision of the separately authorized owner display. */
   privacyRevision: z.string().optional(),
+  scheduleRun: z
+    .object({
+      scheduleId: z.string(),
+      name: z.string().optional(),
+      scheduledFor: z.string(),
+      manual: z.boolean(),
+    })
+    .optional(),
   /** True when the complete stored row came from outside the model. */
   isUserSubmitted: z.boolean().optional(),
   /** JSON pointers to caller-authored fields in an otherwise mixed model response. */

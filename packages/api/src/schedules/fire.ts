@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { logger } from '@librechat/data-schemas';
+import { Constants } from 'librechat-data-provider';
 import type { ScheduleEngineDeps, ScheduleLimits, FireResult, FireableSchedule } from './types';
 import type { AgentTriggerEnvelope } from '../agents/triggers/envelope';
 import type { JsonValue } from '../agents/json';
@@ -54,6 +55,7 @@ function buildScheduleTriggerEnvelope(
   conversationId: string,
   manual: boolean,
   chatProjectId?: string,
+  continuation = false,
 ): AgentTriggerEnvelope {
   const occurrenceId = buildFireClientRequestId(schedule.id, scheduledFor);
   const triggerFiles: JsonValue[] = files.map((file) => {
@@ -66,8 +68,7 @@ function buildScheduleTriggerEnvelope(
     if (file.source != null) value.source = file.source;
     return value;
   });
-  return createAgentTriggerEnvelope({
-    mode: 'fire',
+  const common = {
     requestId: randomUUID(),
     deliveryId: occurrenceId,
     receivedAt: Date.now(),
@@ -76,7 +77,6 @@ function buildScheduleTriggerEnvelope(
       ...(user.role != null && { role: user.role }),
       ...(user.tenantId != null && { tenantId: user.tenantId }),
     },
-    target: { agentId: schedule.agent_id },
     event: {
       id: occurrenceId,
       type: 'schedule.occurrence',
@@ -84,6 +84,22 @@ function buildScheduleTriggerEnvelope(
       source: { id: schedule.id, type: 'schedule' },
     },
     input: schedule.prompt,
+  };
+  if (continuation) {
+    return createAgentTriggerEnvelope({
+      ...common,
+      mode: 'continue',
+      target: {
+        agentId: schedule.agent_id,
+        conversationId,
+        parentMessageId: Constants.NO_PARENT.toString(),
+      },
+    });
+  }
+  return createAgentTriggerEnvelope({
+    ...common,
+    mode: 'fire',
+    target: { agentId: schedule.agent_id },
     run: {
       conversationId,
       timezone: schedule.timezone,
@@ -91,6 +107,7 @@ function buildScheduleTriggerEnvelope(
       ...(triggerFiles.length > 0 && { files: triggerFiles }),
       metadata: {
         manual,
+        scheduleName: schedule.name,
         ...(typeof schedule.configRevision === 'number' && {
           configRevision: schedule.configRevision,
         }),
@@ -252,6 +269,11 @@ export async function fireSchedule(
     // auto-disable threshold) must win over the base config the engine read.
     const ownerLimits = await deps.getLimits(user);
     const deploymentLimits = await deps.getLimits();
+    if (schedule.target === 'same' && ownerLimits.continueConversation !== true) {
+      await methods.disableSchedule(schedule.id, 'continuation_disabled', claimToken);
+      await advance();
+      return { fired: false, skipped: 'disabled' as const };
+    }
     if (!ownerLimits.enabled) {
       // A deployment-wide stop freezes due occurrences. The engine may have claimed
       // this one just before the switch changed, so hand its lease back without
@@ -324,6 +346,11 @@ export async function fireSchedule(
     // pin outranks the stored id, so tightening the config redirects (or stops) an
     // existing schedule instead of grandfathering where its runs land.
     const chatProjectId = resolveScheduleProjectId(ownerLimits, schedule.chatProjectId);
+    if (schedule.binding && chatProjectId !== (schedule.chatProjectId ?? undefined)) {
+      await methods.disableSchedule(schedule.id, 'conversation_project_conflict', claimToken);
+      await advance();
+      return { fired: false, skipped: 'disabled' as const };
+    }
     if (ownerLimits.requireProject && chatProjectId == null) {
       // The requirement was raised after this schedule was created. Disable rather
       // than filing runs loose: the owner chose no project under the old policy, and
@@ -482,7 +509,34 @@ export async function fireSchedule(
     // reserveStartedRun is the atomic overlap guard: the single-active partial index
     // rejects a second `started` run for the schedule, so a concurrent occurrence
     // surfaces as 'overlap' with no read-then-insert race.
-    const conversationId = randomUUID();
+    let conversationId: string = randomUUID();
+    let continuation = false;
+    if (schedule.target === 'same') {
+      const active = await methods.getActiveRunsForSchedule(schedule.id);
+      if (active.some((run) => run.status === 'requires_action')) {
+        await methods.recordSkippedRun({
+          ...baseRun,
+          status: 'skipped_overlap',
+          ...claimedRevision,
+        });
+        await advance();
+        return { fired: false, skipped: 'overlap' as const };
+      }
+      const scope = {
+        scheduleId: schedule.id,
+        userId: user.id,
+        tenantId: user.tenantId,
+        configRevision: schedule.configRevision ?? 0,
+      };
+      const binding = await methods.reserveScheduleConversation(scope, conversationId);
+      if (!binding) return stepAsideSuperseded();
+      conversationId = binding.conversationId;
+      // Resolve a not-yet-materialized binding to recover a crash after message persistence.
+      // Existing conversations select their branch at admission, after busy work settles.
+      continuation =
+        binding.materialized ||
+        (await methods.resolveScheduleConversationBranch(scope)).status !== 'unmaterialized';
+    }
     // Build the durable trigger envelope NOW so the deterministic deliveryKey can be
     // stored on the reservation below — before enqueue. That way schedule reconciliation
     // can read the delivery state (live vs dead) even when the enqueue commits ambiguously,
@@ -499,6 +553,7 @@ export async function fireSchedule(
         conversationId,
         options?.manual === true,
         chatProjectId,
+        continuation,
       );
     } catch (envelopeError) {
       logger.error(`[schedules] trigger envelope build failed for ${schedule.id}:`, envelopeError);
@@ -523,6 +578,8 @@ export async function fireSchedule(
       methods.reserveStartedRun({
         ...baseRun,
         conversationId,
+        ...(continuation && { waiting: true }),
+        manual: options?.manual === true,
         firedAt: new Date(),
         ...(capacitySlot != null ? { capacitySlot } : {}),
         ...(admissionFailure
@@ -554,6 +611,8 @@ export async function fireSchedule(
         error: mcpFailure.message.slice(0, 2048),
         ...(mcpFailure.error ? { mcp: mcpFailure.error.outcomes } : {}),
       });
+    } else if (continuation) {
+      reservation = await reserveRun();
     } else {
       // The GLOBAL fireConcurrency cap is enforced by claiming a unique capacity slot
       // in the SAME insert that reserves a generation, so it is decided by the DB rather
@@ -761,6 +820,6 @@ export async function fireSchedule(
         bookkeepingError,
       );
     }
-    return { fired: true, conversationId };
+    return { fired: true, conversationId, ...(continuation && { waiting: true }) };
   });
 }

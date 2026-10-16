@@ -277,6 +277,9 @@ interface:
   # schedules:
   #   use: true
   #   create: true
+  #   # Allow each schedule to opt into reusing its own conversation (default false).
+  #   # Upgrade all API replicas before enabling; disable and drain before rollback.
+  #   continueConversation: false
   #   maxPerUser: 10
   #   minIntervalMinutes: 60
   #   autoDisableAfterFailures: 5

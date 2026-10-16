@@ -115,6 +115,7 @@ export const buildCreatedInitialResponse = ({
   isRegenerate = false,
 }: Pick<EventSubmission, 'initialResponse' | 'userMessage' | 'isRegenerate'>): TMessage => ({
   ...initialResponse,
+  scheduleRun: isRegenerate ? undefined : userMessage.scheduleRun,
   parentMessageId: responseParentMessageId(initialResponse, userMessage, isRegenerate),
   messageId:
     isRegenerate && initialResponse.messageId

@@ -1,12 +1,19 @@
 /* eslint-disable @typescript-eslint/no-namespace */
 import { z } from 'zod';
 import type {
+  TAttachment,
+  TPlugin,
+  AgentProvider,
+  MemoryScope,
+  SkillsScope,
+  TMessage,
+} from 'src/schemas';
+import type {
   FunctionTool,
   ToolResources,
   AgentToolOptions,
   ToolApprovalGrantBinding,
 } from './tools';
-import type { TAttachment, TPlugin, AgentProvider, MemoryScope, SkillsScope } from 'src/schemas';
 import type { TTokenUsageEvent, TContextUsageEvent, TPendingSteer } from './runs';
 import type { StatefulCodeEnvironment } from '../stateful-code';
 import type { SummaryContentPart } from './content';
@@ -324,6 +331,7 @@ export namespace Agents {
   export interface UserMessageMeta {
     /** Canonical, nonsecret revision used to verify owner-only private text. */
     privacyRevision?: string;
+    scheduleRun?: TMessage['scheduleRun'];
     messageId: string;
     parentMessageId?: string;
     conversationId?: string;

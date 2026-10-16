@@ -91,9 +91,20 @@ const scheduleSchema: Schema<IScheduleDocument> = new Schema(
     },
     target: {
       type: String,
-      enum: ['new'],
+      enum: ['new', 'same'],
       default: 'new',
       required: true,
+    },
+    binding: {
+      type: new Schema(
+        {
+          conversationId: { type: String, required: true },
+          materialized: { type: Boolean, default: false },
+          revision: { type: Number, default: 0 },
+        },
+        { _id: false },
+      ),
+      default: undefined,
     },
     chatProjectId: {
       type: String,
@@ -133,6 +144,10 @@ const scheduleSchema: Schema<IScheduleDocument> = new Schema(
         'insufficient_balance',
         'project_deleted',
         'project_required',
+        'conversation_deleted',
+        'conversation_conflict',
+        'conversation_project_conflict',
+        'continuation_disabled',
       ],
     },
     nextRunAt: {

@@ -3405,5 +3405,21 @@
   "com_ui_tool_approval_connection_unavailable": "Approval cannot be remembered for this connection. Each call requires review.",
   "com_ui_tool_approval_remember_disabled": "Remembered approvals are disabled. Each call requires review.",
   "com_ui_tool_approval_storage_unavailable": "Remembered approval is unavailable. This approval will apply only to this call.",
-  "com_ui_tool_approval_background_unavailable": "Background launches cannot teach approval. Approve a successful foreground call to remember this tool."
+  "com_ui_tool_approval_background_unavailable": "Background launches cannot teach approval. Approve a successful foreground call to remember this tool.",
+  "com_ui_schedule_run_automatic": "Scheduled task",
+  "com_ui_schedule_run_manual": "Manual task run",
+  "com_ui_schedule_run_name": "Task",
+  "com_ui_schedule_run_time": "Occurrence time",
+  "com_ui_schedule_run_instruction": "Instruction for this run",
+  "com_ui_schedule_run_unavailable": "The instruction for this run is unavailable.",
+  "com_ui_schedule_target": "Conversation mode",
+  "com_ui_schedule_target_new": "New conversation each run",
+  "com_ui_schedule_target_same": "Continue the same conversation",
+  "com_ui_schedule_target_same_hint": "The first run creates a dedicated conversation. Later runs include its history and your replies, and wait while it is busy. Longer history may use more tokens.",
+  "com_ui_schedule_binding_locked": "This schedule is bound to its conversation. To change the agent, project, or conversation mode, create a new schedule.",
+  "com_ui_schedule_waiting": "Waiting to continue",
+  "com_ui_schedule_continuation_disabled": "Continuing scheduled conversations is disabled. You can pause this schedule or ask your administrator to enable it.",
+  "com_ui_schedule_conversation_deleted": "The conversation was deleted. Create a new schedule to start another conversation.",
+  "com_ui_schedule_conversation_conflict": "The conversation has an ambiguous or incomplete branch. Create a new schedule to continue safely.",
+  "com_ui_schedule_conversation_project_conflict": "The conversation's project no longer matches this schedule. Restore its original project or create a new schedule."
 }

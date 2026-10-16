@@ -1,3 +1,4 @@
+const { memoize } = require('lodash');
 const {
   createAgentTriggerService,
   createCheckpointDeletionReclaimer,
@@ -56,6 +57,12 @@ const eventActorAdapter = createAgentEventContinueResolver({
   getGenerationJob: (conversationId) => GenerationJobManager.getJob(conversationId),
 });
 let service;
+const getScheduleService = memoize(() =>
+  require('~/server/services/Schedules/service')({
+    enqueueAgentTrigger: (...args) => service.enqueue(...args),
+    getAgentTriggerDelivery: (...args) => service.getDelivery(...args),
+  }),
+);
 const queuedTurnLifecycle = createAgentQueuedTurnLifecycle({
   methods,
   getGenerationJob: (conversationId) => GenerationJobManager.getJob(conversationId),
@@ -76,6 +83,7 @@ service = createAgentTriggerService({
   settleSourceBeforeDeadLetter: queuedTurnLifecycle.settleBeforeDeadLetter,
   prepareContinue: createAgentContinuationResolver({
     eventActor: eventActorAdapter,
+    schedule: (...args) => getScheduleService().prepareScheduleContinuation(...args),
     internalSources: new Map([
       [SUBAGENT_COMPLETION_SOURCE, subagentCompletionAdapter],
       [BACKGROUND_TOOL_COMPLETION_SOURCE, backgroundToolCompletionAdapter],
@@ -101,6 +109,7 @@ const purgeAgentTriggerDeliveriesForUser = async (userId) => {
 };
 
 module.exports = {
+  getScheduleService,
   initializeAgentTriggerService,
   stopAgentTriggerService,
   dispatchAgentTrigger: service.dispatch,

@@ -62,6 +62,11 @@ const messageSchema: Schema<IMessage> = new Schema(
     privateText: { type: String, select: false },
     privacyRevision: { type: String },
     privateTextTokens: { type: [String], select: false, default: undefined },
+    scheduleRun: {
+      type: { scheduleId: String, name: String, scheduledFor: String, manual: Boolean },
+      _id: false,
+      default: undefined,
+    },
     isCreatedByUser: {
       type: Boolean,
       required: true,

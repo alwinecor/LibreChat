@@ -19,6 +19,7 @@ import { ErrorSourceProvider } from '~/components/Messages/Content/Error/source'
 import Elapsed, { shouldShowElapsed } from '~/components/Chat/Messages/Elapsed';
 import { getHeaderHoverLabel } from '~/components/Chat/Messages/ui/HeaderLabel';
 import ContentParts from '~/components/Chat/Messages/Content/ContentParts';
+import ScheduleBadge from '~/components/Chat/Messages/ui/ScheduleBadge';
 import { PrivateText } from '~/components/Chat/Messages/PrivateText';
 import SiblingSwitch from '~/components/Chat/Messages/SiblingSwitch';
 import HoverButtons from '~/components/Chat/Messages/HoverButtons';
@@ -168,6 +169,7 @@ const ContentRender = memo(function ContentRender({
 
   return (
     <MessageRow
+      accessory={msg.scheduleRun && !msg.isCreatedByUser ? <ScheduleBadge message={msg} /> : null}
       id={msg.messageId}
       icon={author.icon}
       label={author.label}
