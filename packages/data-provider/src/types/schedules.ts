@@ -12,7 +12,7 @@ export type ScheduleFrequency = (typeof scheduleFrequencies)[number];
  *  list: an every-minute-of-the-hour cadence spelled out runs past two hundred chars. */
 export const SCHEDULE_CRON_MAX_LENGTH = 256;
 
-export const scheduleTargets = ['new'] as const;
+export const scheduleTargets = ['new', 'same'] as const;
 export type ScheduleTarget = (typeof scheduleTargets)[number];
 
 export type ScheduleDisabledReason =
@@ -25,9 +25,14 @@ export type ScheduleDisabledReason =
   | 'permission_revoked'
   | 'insufficient_balance'
   | 'project_deleted'
+  | 'conversation_deleted'
+  | 'conversation_conflict'
+  | 'conversation_project_conflict'
+  | 'continuation_disabled'
   | 'project_required';
 
 export type ScheduleRunStatus =
+  | 'waiting'
   | 'started'
   | 'requires_action'
   | 'success'
@@ -77,6 +82,10 @@ export const createSchedulePayloadSchema = z.object({
   cadence: scheduleCadenceSchema,
   timezone: z.string().min(1),
   target: z.enum(scheduleTargets).default('new'),
+  /** Bindings are allocated by the server, never supplied by a schedule client. */
+  binding: z.never().optional(),
+  conversationId: z.never().optional(),
+  parentMessageId: z.never().optional(),
   file_ids: z
     .array(z.string())
     .max(10)
@@ -135,6 +144,10 @@ export type TSchedule = {
   cadence: TScheduleCadence;
   timezone: string;
   target: ScheduleTarget;
+  bindingLocked?: boolean;
+  /** Dedicated conversation, exposed only after its first turn is persisted. */
+  conversationId?: string;
+  waiting?: boolean;
   file_ids?: string[];
   chatProjectId?: string | null;
   enabled: boolean;
@@ -173,6 +186,7 @@ export type TScheduleRun = {
  *  per-principal `interface.schedules` resolution the write handlers and the fire
  *  path enforce, so the form can never offer a choice the server would refuse. */
 export type TScheduleLimits = {
+  continueConversation?: boolean;
   mcpConsent?: boolean;
   maxPerUser: number;
   /** Served with the list so the dialog can refuse a cadence the floor would reject
@@ -193,7 +207,7 @@ export type TSchedulesResponse = {
 export type TScheduleRunNowResponse = {
   scheduleId: string;
   conversationId: string;
-  status: 'started';
+  status: 'started' | 'waiting';
 };
 
 /** A durable invocation receipt, not a readiness snapshot or an arbitrary tool error. */

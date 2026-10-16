@@ -52,6 +52,7 @@ export type AgentTriggerContinuePreparation =
   | {
       status: 'ready';
       scheduleMCPIdentity?: ScheduledMCPIdentity;
+      scheduleMetadata?: { manual: boolean; configRevision: number; scheduleName?: string };
       input: string;
       parentMessageId: string;
       expectedPredecessorCreatedAt?: number;
@@ -732,7 +733,7 @@ async function startRun(
                 }),
               },
             }),
-          ...(envelope.mode === 'fire' && {
+          ...((envelope.mode === 'fire' || readyPreparation?.scheduleMetadata != null) && {
             agentTrigger: {
               version: envelope.version,
               deliveryId: envelope.deliveryId,
@@ -744,6 +745,9 @@ async function startRun(
               },
               ...(run?.metadata !== undefined && {
                 metadata: run.metadata,
+              }),
+              ...(readyPreparation?.scheduleMetadata != null && {
+                metadata: readyPreparation.scheduleMetadata,
               }),
             },
           }),

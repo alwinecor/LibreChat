@@ -7,6 +7,12 @@ import type { ScheduledMCPEnrollment } from 'librechat-data-provider';
 import type { ScheduleMCPOutcome } from 'librechat-data-provider';
 import type { Document, Types } from 'mongoose';
 
+export interface ScheduleConversationBinding {
+  conversationId: string;
+  materialized: boolean;
+  revision: number;
+}
+
 export interface ISchedule {
   _id?: Types.ObjectId;
   id: string;
@@ -17,7 +23,8 @@ export interface ISchedule {
   agent_id: string;
   cadence: TScheduleCadence;
   timezone: string;
-  target: 'new';
+  target: 'new' | 'same';
+  binding?: ScheduleConversationBinding;
   /** Chat project every run's conversation is filed under. Re-validated at each
    *  fire; a pinned operator project (interface.schedules.projectId) overrides it. */
   chatProjectId?: string;
@@ -81,6 +88,13 @@ export interface IScheduleDocument extends Omit<ISchedule, 'id' | '_id'>, Docume
 }
 
 export interface IScheduleRun {
+  manual?: boolean;
+  dispatchStarted?: boolean;
+  predecessorCreatedAt?: number;
+  /** Durable dispatch waiting for conversation admission; still owns the occurrence. */
+  waiting?: boolean;
+  continuationParentMessageId?: string;
+  generationCreatedAt?: number;
   mcp?: ScheduleMCPOutcome[];
   _id?: Types.ObjectId;
   scheduleId: string;

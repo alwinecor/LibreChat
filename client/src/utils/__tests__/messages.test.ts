@@ -370,6 +370,12 @@ const makeFieldsMsg = (over: Partial<TMessage> = {}): TMessage =>
 const FIELD_MUTATIONS: Array<[string, Partial<TMessage>]> = [
   ['messageId', { messageId: 'm2' }],
   ['text', { text: 'changed' }],
+  [
+    'task provenance',
+    {
+      scheduleRun: { scheduleId: 'task', manual: false, scheduledFor: '2026-10-16T10:00:00.000Z' },
+    },
+  ],
   ['error', { error: true }],
   ['unfinished', { unfinished: true }],
   ['finish_reason', { finish_reason: 'tool_call_limit' }],

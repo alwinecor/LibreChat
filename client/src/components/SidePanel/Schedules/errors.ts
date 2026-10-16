@@ -81,6 +81,11 @@ export function scheduleMCPErrorMessage(
   const response = (
     error as Error & { response?: { status?: number; data?: { code?: string; mcp?: object } } }
   ).response;
+  const code = response?.data?.code;
+  if (code === 'SCHEDULE_CONTINUATION_DISABLED')
+    return localize('com_ui_schedule_continuation_disabled');
+  if (code === 'SCHEDULE_BINDING_IMMUTABLE') return localize('com_ui_schedule_binding_locked');
+  if (code === 'SCHEDULE_ALREADY_PENDING') return localize('com_ui_schedule_waiting');
   return response?.data?.code === 'mcp_unavailable'
     ? localize(MCP_STATUS_LABELS.mcp_unavailable)
     : undefined;

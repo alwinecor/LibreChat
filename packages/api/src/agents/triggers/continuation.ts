@@ -5,16 +5,21 @@ type ContinueResolver = NonNullable<AgentTriggerExecutionHostDeps['prepareContin
 export interface AgentContinuationResolverDeps {
   eventActor: ContinueResolver;
   internalSources: ReadonlyMap<string, ContinueResolver>;
+  schedule?: ContinueResolver;
 }
 
 /** Selects the single continuation adapter authorized for this delivery. */
 export function createAgentContinuationResolver({
   eventActor,
   internalSources,
+  schedule,
 }: AgentContinuationResolverDeps): ContinueResolver {
   return (envelope, context) => {
     if (envelope.target.bindingId != null && envelope.target.sourceKeyId != null) {
       return eventActor(envelope, context);
+    }
+    if (envelope.event.source.type === 'schedule') {
+      return schedule?.(envelope, context);
     }
     if (envelope.event.source.type !== 'internal') {
       return;

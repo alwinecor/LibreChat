@@ -73,6 +73,31 @@ async function openSchedulesPanel(page: Page) {
 }
 
 test.describe('scheduled chats', () => {
+  test('creates persistent mode through the dialog and preserves it after reload', async ({
+    page,
+  }) => {
+    await page.goto('/c/new');
+    const token = await getAccessToken(page);
+    const agent = await ensureAgent(page, token);
+    await openSchedulesPanel(page);
+    await page.getByRole('button', { name: 'New schedule', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'New schedule' });
+    const name = uniqueName('Persistent UI');
+    await dialog.getByLabel('Name', { exact: true }).fill(name);
+    await dialog.getByRole('combobox', { name: 'Agent', exact: true }).click();
+    await page.getByRole('option', { name: agent.name, exact: true }).click();
+    await dialog.getByRole('radio', { name: 'Continue the same conversation' }).click();
+    await dialog.locator('#schedule-prompt').fill('Remember the previous reports');
+    await dialog.getByRole('button', { name: 'Create', exact: true }).click();
+    await expect(dialog).not.toBeVisible();
+    await page.reload();
+    await openSchedulesPanel(page);
+    const card = page.getByTestId('schedule-card').filter({ hasText: name });
+    await card.getByRole('button', { name: 'Schedule options' }).click();
+    await page.getByRole('menuitem', { name: 'Edit', exact: true }).click();
+    await expect(page.getByRole('radio', { name: 'Continue the same conversation' })).toBeChecked();
+  });
+
   test('lists a schedule and toggles + deletes it through the panel', async ({ page }) => {
     test.setTimeout(120000);
     await page.goto('/c/new', { timeout: 15000 });

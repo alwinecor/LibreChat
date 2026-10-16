@@ -25,6 +25,7 @@ interface:
   # out the production 60-minute floor.
   schedules:
     use: true
+    continueConversation: true
     minIntervalMinutes: 1
 
 # Enables the memory feature so the MEMORIES.USE permission is granted and the

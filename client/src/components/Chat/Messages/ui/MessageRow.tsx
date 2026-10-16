@@ -11,6 +11,7 @@ type MessageRowProps = {
   icon: ReactNode;
   children: ReactNode;
   footer: ReactNode;
+  accessory?: ReactNode;
   timestamp?: string | null;
   ariaLabel?: string;
   headerPrefix?: string;
@@ -92,6 +93,7 @@ export default function MessageRow({
   label,
   hoverLabel,
   footer,
+  accessory,
   children,
   timestamp,
   ariaLabel,
@@ -163,6 +165,7 @@ export default function MessageRow({
             align: isCreatedByUser ? 'end' : 'start',
           })}
 
+        {accessory}
         <div className={cn('flex w-full flex-col gap-1', isUserSide && 'items-end')}>
           <div
             className={cn(

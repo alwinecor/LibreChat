@@ -4,7 +4,7 @@ import { createAgentContinuationResolver } from './continuation';
 
 function envelope(options: {
   sourceId: string;
-  sourceType?: 'internal' | 'webhook';
+  sourceType?: 'internal' | 'webhook' | 'schedule';
   binding?: boolean;
 }): AgentContinueTriggerEnvelope {
   return {
@@ -33,6 +33,25 @@ function envelope(options: {
 
 describe('agent continuation admission', () => {
   const context = { idempotencyKey: 'delivery-1' } as AgentTriggerDispatchContext;
+
+  it('routes schedule sources only to the injected schedule adapter', async () => {
+    const schedule = jest.fn(async () => ({ status: 'settled' as const }));
+    const eventActor = jest.fn();
+    const resolve = createAgentContinuationResolver({
+      eventActor,
+      internalSources: new Map(),
+      schedule,
+    });
+    await expect(
+      resolve(envelope({ sourceId: 'sched-1', sourceType: 'schedule' }), context),
+    ).resolves.toEqual({ status: 'settled' });
+    expect(schedule).toHaveBeenCalledTimes(1);
+    expect(
+      resolve(envelope({ sourceId: 'sched-1', sourceType: 'webhook' }), context),
+    ).toBeUndefined();
+    expect(schedule).toHaveBeenCalledTimes(1);
+    expect(eventActor).not.toHaveBeenCalled();
+  });
 
   it('routes bound work exclusively through the event actor adapter', async () => {
     const eventActor = jest.fn(async () => ({ status: 'settled' as const }));

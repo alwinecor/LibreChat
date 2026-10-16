@@ -46,6 +46,7 @@ async function abortMessage(req, res) {
   const completionTokens = await countTokens(text);
 
   const responseMessage = {
+    scheduleRun: jobData?.userMessage?.scheduleRun,
     messageId: jobData?.responseMessageId,
     parentMessageId: jobData?.userMessage?.messageId,
     conversationId: jobData?.conversationId,
@@ -127,6 +128,7 @@ async function abortMessage(req, res) {
           text: jobData.userMessage.text,
           quotes: jobData.userMessage.quotes,
           reasoningOverride: jobData.userMessage.reasoningOverride,
+          scheduleRun: jobData.userMessage.scheduleRun,
           isCreatedByUser: true,
         })
       : null,

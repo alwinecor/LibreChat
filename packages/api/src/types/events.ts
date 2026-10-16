@@ -1,4 +1,4 @@
-import type { TPendingSteer } from 'librechat-data-provider';
+import type { TPendingSteer, TMessage } from 'librechat-data-provider';
 
 /** SSE streaming event (on_run_step, on_message_delta, etc.) */
 export type StreamEvent = {
@@ -15,6 +15,7 @@ export type CreatedEvent = {
     conversationId?: string;
     text?: string;
     privacyRevision?: string;
+    scheduleRun?: TMessage['scheduleRun'];
     sender: string;
     isCreatedByUser: boolean;
     /** Quoted excerpts referenced on this turn, carried through resumable job

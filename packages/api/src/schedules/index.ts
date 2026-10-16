@@ -4,6 +4,7 @@ export * from './context';
 export * from './engine';
 export * from './erasure';
 export * from './fire';
+export * from './drain';
 export * from './handlers';
 export * from './readiness';
 export * from './trigger';
@@ -23,3 +24,4 @@ export * from './authorization/runtime';
 export * from './authorization/policy';
 
 export * from './authorization/continuation';
+export * from './message';

@@ -6,9 +6,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ScheduleMCPConsentView } from 'librechat-data-provider';
 import Consent from '../Consent';
 
-jest.mock('~/hooks', () => ({ useLocalize: () => (key: string) => key }));
+const mockLocalize = jest.fn((key: string, _options?: { time?: string }) => key);
+jest.mock('~/hooks', () => ({ useLocalize: () => mockLocalize }));
+jest.mock('~/hooks/useClockFormat', () => ({ __esModule: true, default: () => false }));
 jest.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en-US' } }),
+  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'zh-Hans' } }),
 }));
 jest.mock('librechat-data-provider', () => {
   const actual = jest.requireActual('librechat-data-provider');
@@ -56,7 +58,21 @@ function display() {
   return client;
 }
 beforeEach(() => {
+  mockLocalize.mockClear();
   jest.mocked(dataService.getScheduleMCPConsent).mockResolvedValue(view);
+});
+it('formats the authorization deadline with the interface language and clock preference', async () => {
+  const expiresAtMs = Date.parse('2026-10-16T10:00:00Z');
+  jest.mocked(dataService.getScheduleMCPConsent).mockResolvedValue({ ...view, expiresAtMs });
+  display();
+  await screen.findByText('com_ui_schedule_consent_deadline');
+  expect(mockLocalize).toHaveBeenCalledWith('com_ui_schedule_consent_deadline', {
+    time: new Intl.DateTimeFormat('zh-Hans', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      hour12: false,
+    }).format(expiresAtMs),
+  });
 });
 it('renders loading, then the exact agent/resource and bounded lifetime', async () => {
   let resolve!: (value: ScheduleMCPConsentView) => void;

@@ -661,6 +661,7 @@ const buildResumeEventSubmission = (
 
   const initialResponse = {
     ...(currentSubmission.initialResponse as TMessage),
+    scheduleRun: currentSubmission.isRegenerate ? undefined : userMessage.scheduleRun,
     messageId: responseMessageId,
     parentMessageId: userMessage.messageId,
     conversationId,

@@ -20,6 +20,7 @@ export interface ScheduleRowState {
 
 /** How a finished run colours the row that owns it. */
 const RUN_TONE: Record<ScheduleRunStatus, { tone: ScheduleRowTone; label: TranslationKeys }> = {
+  waiting: { tone: 'running', label: 'com_ui_schedule_waiting' },
   success: { tone: 'running', label: 'com_ui_schedule_last_run' },
   error: { tone: 'error', label: 'com_ui_schedule_last_run_failed' },
   interrupted: { tone: 'error', label: 'com_ui_schedule_last_run_failed' },
@@ -37,7 +38,7 @@ const RUN_TONE: Record<ScheduleRunStatus, { tone: ScheduleRowTone; label: Transl
  * clock has stopped either way and the reason is printed underneath.
  */
 export function scheduleRowState(
-  schedule: Pick<TSchedule, 'enabled' | 'disabledReason' | 'lastRun'>,
+  schedule: Pick<TSchedule, 'enabled' | 'disabledReason' | 'lastRun' | 'waiting'>,
   localize: LocalizeFunction,
 ): ScheduleRowState {
   if (schedule.disabledReason != null) {
@@ -45,6 +46,9 @@ export function scheduleRowState(
   }
   if (!schedule.enabled) {
     return { tone: 'paused', label: localize('com_ui_schedule_paused') };
+  }
+  if (schedule.waiting) {
+    return { tone: 'running', label: localize('com_ui_schedule_waiting') };
   }
   const lastRun = schedule.lastRun ? RUN_TONE[schedule.lastRun.status] : null;
   if (lastRun != null && lastRun.tone !== 'running') {

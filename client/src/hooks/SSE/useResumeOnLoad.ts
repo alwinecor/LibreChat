@@ -207,6 +207,7 @@ function buildSubmissionFromResumeState(
           parentMessageId: userMessageData.parentMessageId ?? Constants.NO_PARENT,
           conversationId: userMessageData.conversationId ?? conversationId,
           text: userMessageData.text ?? '',
+          scheduleRun: userMessageData.scheduleRun,
           isCreatedByUser: true,
           role: 'user',
         }) as TMessage)
@@ -221,6 +222,7 @@ function buildSubmissionFromResumeState(
   // ALWAYS use aggregatedContent from resumeState - it has the latest content from the running job.
   // DB content may be stale (saved at disconnect, but generation continued).
   let initialResponse: TMessage = {
+    scheduleRun: isRegenerateResume ? undefined : userMessage.scheduleRun,
     messageId: existingResponseMessage?.messageId ?? responseMessageId,
     parentMessageId: existingResponseMessage?.parentMessageId ?? userMessage.messageId,
     conversationId,

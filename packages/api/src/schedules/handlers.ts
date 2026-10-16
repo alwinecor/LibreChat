@@ -252,7 +252,7 @@ export type WireSchedule = Pick<
   | 'createdAt'
   | 'updatedAt'
 > &
-  Pick<TSchedule, 'hasMCPConsent'> & {
+  Pick<TSchedule, 'hasMCPConsent' | 'conversationId' | 'waiting' | 'bindingLocked'> & {
     /** See `TSchedule.inFlight`: the generating occurrences, from their own run rows. */
     inFlight?: Array<{ conversationId: string }>;
   };
@@ -271,7 +271,7 @@ export function toWireInFlight(
   runs: readonly IScheduleRun[],
 ): Array<{ conversationId: string }> | undefined {
   const chats = runs.flatMap((run) =>
-    run.conversationId != null ? [{ conversationId: run.conversationId }] : [],
+    run.conversationId != null && !run.waiting ? [{ conversationId: run.conversationId }] : [],
   );
   return chats.length > 0 ? chats : undefined;
 }
@@ -311,7 +311,12 @@ export function toWireSchedule(
     cadence: schedule.cadence,
     timezone: schedule.timezone,
     target: schedule.target,
-    chatProjectId: resolveScheduleProjectId(limits ?? {}, schedule.chatProjectId),
+    ...(schedule.binding && { bindingLocked: true }),
+    ...(schedule.binding?.materialized && { conversationId: schedule.binding.conversationId }),
+    ...(inFlight.some((run) => run.waiting) && { waiting: true }),
+    chatProjectId: schedule.binding
+      ? schedule.chatProjectId
+      : resolveScheduleProjectId(limits ?? {}, schedule.chatProjectId),
     file_ids: schedule.file_ids,
     enabled: schedule.enabled,
     disabledReason: schedule.disabledReason,
@@ -595,6 +600,7 @@ export function createSchedulesHandlers(deps: SchedulesHandlersDeps): SchedulesH
         // minIntervalMinutes ships with the list so the dialog can refuse a cadence
         // the floor would reject, instead of surfacing it as a 400 after submit.
         minIntervalMinutes: limits.minIntervalMinutes,
+        continueConversation: limits.continueConversation === true,
         requireProject: limits.requireProject,
         ...(limits.projectId != null && { projectId: limits.projectId }),
       },
@@ -714,6 +720,10 @@ export function createSchedulesHandlers(deps: SchedulesHandlersDeps): SchedulesH
     if (mcpSignal.aborted) return;
     if (replayed != null) {
       await respondToReplay(replayed);
+      return;
+    }
+    if (parsed.data.target === 'same' && limits.continueConversation !== true) {
+      res.status(403).json({ code: 'SCHEDULE_CONTINUATION_DISABLED' });
       return;
     }
     const id = `sched_${randomUUID()}`;
@@ -933,6 +943,16 @@ export function createSchedulesHandlers(deps: SchedulesHandlersDeps): SchedulesH
       res.status(404).json({ error: 'Schedule not found' });
       return;
     }
+    if (
+      existing.binding &&
+      ((parsed.data.target != null && parsed.data.target !== existing.target) ||
+        (parsed.data.agent_id != null && parsed.data.agent_id !== existing.agent_id) ||
+        (parsed.data.chatProjectId !== undefined &&
+          (parsed.data.chatProjectId ?? null) !== (existing.chatProjectId ?? null)))
+    ) {
+      res.status(409).json({ code: 'SCHEDULE_BINDING_IMMUTABLE' });
+      return;
+    }
     // Client-side revision fence: the dialog rebuilds compound fields (cadence)
     // from the snapshot it opened with, so an edit from another tab is invisible
     // to the fresh-read fence below — the payload is internally consistent with a
@@ -945,6 +965,14 @@ export function createSchedulesHandlers(deps: SchedulesHandlersDeps): SchedulesH
     const limits = await deps.getLimits(user);
     // When the owner's config disables schedules, block edits that keep the
     // schedule enabled; still allow turning one OFF.
+    if (
+      (parsed.data.target ?? existing.target) === 'same' &&
+      limits.continueConversation !== true &&
+      (parsed.data.enabled ?? existing.enabled)
+    ) {
+      res.status(403).json({ code: 'SCHEDULE_CONTINUATION_DISABLED' });
+      return;
+    }
     if (!limits.enabled && (parsed.data.enabled ?? existing.enabled)) {
       res.status(403).json({ error: 'Scheduled chats are disabled' });
       return;
@@ -1207,7 +1235,11 @@ export function createSchedulesHandlers(deps: SchedulesHandlersDeps): SchedulesH
       });
       return;
     }
-    res.json({ scheduleId: schedule.id, conversationId: result.conversationId, status: 'started' });
+    res.json({
+      scheduleId: schedule.id,
+      conversationId: result.conversationId,
+      status: result.waiting ? 'waiting' : 'started',
+    });
   }
 
   return {

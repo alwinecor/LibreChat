@@ -1,4 +1,5 @@
 import { useState, useId } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button, Input, Label, Spinner, OGDialog, OGDialogTemplate } from '@librechat/client';
 import type { ScheduleMCPConsentView } from 'librechat-data-provider';
 import type { MutableRefObject } from 'react';
@@ -6,6 +7,8 @@ import {
   useScheduleMCPConsent,
   useScheduleMCPConsentMutations,
 } from '~/data-provider/Schedules/consent';
+import useClockFormat from '~/hooks/useClockFormat';
+import { getMessageTimestamp } from '~/utils';
 import { useLocalize } from '~/hooks';
 
 const statusKeys = {
@@ -37,6 +40,8 @@ export default function Consent({
   triggerRef: MutableRefObject<HTMLButtonElement | null>;
 }) {
   const localize = useLocalize();
+  const { i18n } = useTranslation();
+  const hour12 = useClockFormat();
   const inputId = useId();
   const query = useScheduleMCPConsent(id);
   const { confirm, revoke } = useScheduleMCPConsentMutations(id);
@@ -44,6 +49,10 @@ export default function Consent({
   const [message, setMessage] = useState<'success' | 'revoked' | 'error' | null>(null);
   const busy = confirm.isLoading || revoke.isLoading || query.isFetching;
   const data: ScheduleMCPConsentView | undefined = query.data;
+  const expiry =
+    data?.expiresAtMs == null
+      ? null
+      : getMessageTimestamp(new Date(data.expiresAtMs).toJSON(), i18n.language, hour12);
   const commit = () => {
     if (!data?.offer) return;
     setMessage(null);
@@ -86,10 +95,10 @@ export default function Consent({
             {!query.isLoading && !query.isError && data && (
               <>
                 <p role="status">{localize(statusKeys[data.state])}</p>
-                {data.expiresAtMs != null && (
+                {expiry && (
                   <p className="text-text-secondary text-sm">
                     {localize('com_ui_schedule_consent_deadline', {
-                      time: new Date(data.expiresAtMs).toLocaleString(),
+                      time: expiry.absolute,
                     })}
                   </p>
                 )}

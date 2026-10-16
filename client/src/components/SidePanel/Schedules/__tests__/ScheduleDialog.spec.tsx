@@ -33,6 +33,7 @@ let mockLimits: {
   minIntervalMinutes: number;
   requireProject: boolean;
   projectId?: string;
+  continueConversation?: boolean;
 } = {
   maxPerUser: 10,
   minIntervalMinutes: 0,
@@ -123,6 +124,34 @@ const fillRequiredFields = async (user: ReturnType<typeof userEvent.setup>) => {
 };
 
 describe('ScheduleDialog', () => {
+  it('creates a schedule that continues its dedicated conversation', async () => {
+    mockLimits.continueConversation = true;
+    const user = userEvent.setup();
+    renderDialog();
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole('radio', { name: 'com_ui_schedule_target_same' }));
+    await user.click(screen.getByRole('button', { name: 'com_ui_create' }));
+    await waitFor(() =>
+      expect(mockMutate).toHaveBeenCalledWith(expect.objectContaining({ target: 'same' })),
+    );
+  });
+
+  it('preserves a stored mode with the feature disabled and locks a bound identity', () => {
+    mockLimits.projectId = 'new-pin';
+    renderDialog(storedSchedule({ target: 'same', bindingLocked: true, conversationId: 'bound' }));
+    expect(screen.getByRole('radio', { name: 'com_ui_schedule_target_same' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'com_ui_schedule_target_new' })).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'com_ui_agent' })).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'com_ui_project' })).toBeDisabled();
+    expect(screen.getByText('com_ui_schedule_binding_locked')).toBeInTheDocument();
+  });
+
+  it('does not offer persistent mode when it is unavailable for a new schedule', () => {
+    renderDialog();
+    expect(
+      screen.queryByRole('radio', { name: 'com_ui_schedule_target_same' }),
+    ).not.toBeInTheDocument();
+  });
   afterEach(() => {
     jest.clearAllMocks();
     mockLimits = { maxPerUser: 10, minIntervalMinutes: 0, requireProject: false };

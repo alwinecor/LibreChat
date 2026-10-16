@@ -39,6 +39,7 @@ const {
   rejectPrivateTextAdmission,
   bindPrivateTextPersistenceAbort,
   persistedReasoningOverrideFields,
+  scheduledMessageFields,
 } = require('@librechat/api');
 const {
   Constants,
@@ -623,6 +624,7 @@ class BaseClient {
 
     Object.assign(
       userMessage,
+      scheduledMessageFields(this.options.req),
       persistedReasoningOverrideFields({
         rawReasoningOverride: this.options.req?.body?.reasoningOverride,
         isEdited: opts.isEdited,
@@ -1081,6 +1083,7 @@ class BaseClient {
 
     /** @type {TMessage} */
     const responseMessage = {
+      ...scheduledMessageFields(this.options.req),
       messageId: responseMessageId,
       conversationId,
       parentMessageId: userMessage.messageId,

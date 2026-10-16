@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { RecoilRoot } from 'recoil';
-import { act, render } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import type { TConversation, TMessage } from 'librechat-data-provider';
 import { ChatContext, MessagesViewProvider, useChatContext } from '~/Providers';
 import MessageContent from '../MessageContent';
@@ -203,6 +203,32 @@ describe('message rows across a send', () => {
 
     expect(rendersOf('user-1', 'assistant-1', 'user-2')).toEqual([0, 0, 0]);
     expect(rendersOf('assistant-2', 'user-3', 'assistant-3_')).toEqual([1, 1, 1]);
+  });
+
+  it('removes a task prompt bubble without removing its assistant reply or ordinary user rows', () => {
+    act(() => {
+      setThreadState({
+        messages: thread(
+          settled.map((message) =>
+            message.messageId === 'user-1'
+              ? {
+                  ...message,
+                  scheduleRun: {
+                    scheduleId: 'task',
+                    manual: false,
+                    scheduledFor: '2026-10-16T10:00:00.000Z',
+                  },
+                }
+              : message,
+          ),
+        ),
+        latestMessageId: 'assistant-2',
+        isSubmitting: false,
+      });
+    });
+    expect(screen.queryByTestId('row-user-1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('row-assistant-1')).toBeInTheDocument();
+    expect(screen.getByTestId('row-user-2')).toBeInTheDocument();
   });
 
   it('leaves settled rows alone when the streaming id hydrates and the run settles', () => {

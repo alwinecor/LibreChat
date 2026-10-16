@@ -1,6 +1,13 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { getAccessToken, requestJson, replyPrompt, replyText } from './helpers';
+import {
+  getAccessToken,
+  requestJson,
+  replyPrompt,
+  replyText,
+  sendMessage,
+  sendMessageAndWaitForCompletion,
+} from './helpers';
 
 const uniqueName = (prefix: string) => `${prefix} ${Date.now()}-${Math.floor(Math.random() * 1e4)}`;
 
@@ -13,6 +20,9 @@ type Schedule = {
   cadence?: { frequency: string; hour?: number; minute?: number };
   lastRun?: { status: string; conversationId?: string };
   runCount?: number;
+  conversationId?: string;
+  waiting?: boolean;
+  target?: string;
 };
 type ScheduleList = { schedules: Schedule[] };
 type RunNowResult = { scheduleId: string; conversationId?: string; status?: string };
@@ -77,6 +87,93 @@ const scheduleBody = (agentId: string, over: Record<string, unknown> = {}) => ({
 });
 
 test.describe('scheduled chat execution', () => {
+  for (const mode of ['idle', 'busy', 'compacted']) {
+    test(`persistent schedule includes manual history after ${mode}`, async ({ page }) => {
+      const busy = mode === 'busy';
+      test.setTimeout(180000);
+      await page.goto('/c/new');
+      const token = await getAccessToken(page);
+      const agent = await ensureAgent(page, token);
+      const label = uniqueName('persistent');
+      const schedule = await createSchedule(
+        page,
+        token,
+        scheduleBody(agent.id, { target: 'same', prompt: replyPrompt(label) }),
+      );
+      const run = () =>
+        requestJson<RunNowResult>(page, {
+          path: `/api/schedules/${schedule.id}/run`,
+          token,
+          method: 'POST',
+        });
+      const first = await run();
+      await expect
+        .poll(async () => (await readSchedule(page, token, schedule.id))?.runCount, {
+          timeout: 60000,
+        })
+        .toBe(1);
+      expect((await readSchedule(page, token, schedule.id))?.conversationId).toBe(
+        first.conversationId,
+      );
+      await page.goto(`/c/${first.conversationId}`);
+      const transcript = page.getByTestId('messages-view');
+      await expect(
+        transcript.getByRole('button', { name: 'Manual task run', exact: true }),
+      ).toBeVisible();
+      await expect(transcript.getByText(replyPrompt(label), { exact: true })).toHaveCount(0);
+      if (mode === 'compacted') {
+        await page.getByTestId('token-usage').click();
+        await page.getByRole('button', { name: 'Compact context' }).click();
+        await expect(
+          page.getByTestId('messages-view').getByText('You compacted the context'),
+        ).toBeVisible({ timeout: 60000 });
+      }
+      const fact = `MANUAL-${Date.now()}`;
+      if (busy) {
+        await sendMessage(page, `Remember ${fact}\nE2E_PRE_TOKEN_REPLY:busy`);
+      } else {
+        await sendMessageAndWaitForCompletion(page, `Remember ${fact}`);
+      }
+      await requestJson(page, {
+        path: `/api/schedules/${schedule.id}`,
+        token,
+        method: 'PATCH',
+        body: { prompt: `E2E_ASSERT_HISTORY:${fact}` },
+      });
+      const second = await run();
+      expect(second).toMatchObject({ status: 'waiting', conversationId: first.conversationId });
+      if (busy) {
+        expect((await readSchedule(page, token, schedule.id))?.waiting).toBe(true);
+      }
+      await expect
+        .poll(async () => (await readSchedule(page, token, schedule.id))?.runCount, {
+          timeout: 90000,
+        })
+        .toBe(2);
+      await page.reload();
+      if (mode === 'idle') {
+        const badges = transcript.getByRole('button', { name: 'Manual task run', exact: true });
+        await expect(badges).toHaveCount(2);
+        await badges.first().click();
+        await expect(transcript.getByText(replyPrompt(label), { exact: true })).toBeVisible();
+        await expect(
+          transcript.getByText(`E2E_ASSERT_HISTORY:${fact}`, { exact: true }),
+        ).toHaveCount(0);
+        await badges.last().click();
+        await expect(
+          transcript.getByText(`E2E_ASSERT_HISTORY:${fact}`, { exact: true }),
+        ).toBeVisible();
+        await expect(transcript.getByText(`Remember ${fact}`, { exact: true })).toBeVisible();
+      }
+      await expect(page.getByTestId('messages-view')).toContainText(
+        `E2E history assertion present: ${fact}`,
+        { timeout: 20000 },
+      );
+      const persisted = await readSchedule(page, token, schedule.id);
+      expect(persisted).toMatchObject({ target: 'same', conversationId: first.conversationId });
+      expect(persisted?.lastRun?.status).toBe('success');
+    });
+  }
   /**
    * Run Now is the one path that dispatches a real generation on demand, so it is
    * where a broken loopback URL, a rejected fire token, or a lost schedule identity
@@ -166,6 +263,12 @@ test.describe('scheduled chat execution', () => {
     expect(new Date(after!.nextRunAt!).getTime()).toBeGreaterThan(
       new Date(before!.nextRunAt!).getTime(),
     );
+    await page.goto(`/c/${after?.lastRun?.conversationId}`);
+    const transcript = page.getByTestId('messages-view');
+    await expect(
+      transcript.getByRole('button', { name: 'Scheduled task', exact: true }),
+    ).toBeVisible();
+    await expect(transcript.getByText(replyPrompt(label), { exact: true })).toHaveCount(0);
   });
 
   test('rejects an invalid timezone before persisting anything', async ({ page }) => {
@@ -281,6 +384,15 @@ test.describe('scheduled chat execution', () => {
       )
       .toBe(true);
 
+    await page.goto(`/c/${conversationId}`);
+    const transcript = page.getByTestId('messages-view');
+    const badge = transcript.getByRole('button', { name: 'Manual task run', exact: true });
+    await expect(badge).toBeVisible();
+    await expect(transcript).not.toContainText('E2E_SLOW_REPLY:');
+    await page.reload();
+    await expect(badge).toBeVisible();
+    await expect(transcript).not.toContainText('E2E_SLOW_REPLY:');
+
     await requestJson<unknown>(page, {
       path: `/api/schedules/${schedule.id}`,
       token,
@@ -302,5 +414,10 @@ test.describe('scheduled chat execution', () => {
       .toBe(false);
 
     expect(await readSchedule(page, token, schedule.id)).toBeUndefined();
+    await page.reload();
+    await expect(badge).toBeVisible();
+    await expect(transcript).not.toContainText('E2E_SLOW_REPLY:');
+    await badge.click();
+    await expect(transcript).toContainText('E2E_SLOW_REPLY:');
   });
 });

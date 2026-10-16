@@ -47,6 +47,9 @@ jest.mock('@librechat/data-schemas', () => ({
 }));
 
 jest.mock('@librechat/api', () => ({
+  scheduledMessageFields: jest.requireActual('@librechat/api').scheduledMessageFields,
+  stampScheduledMessage: jest.requireActual('@librechat/api').stampScheduledMessage,
+  drainScheduledProvider: jest.requireActual('@librechat/api').drainScheduledProvider,
   savePrivateTextMessage: (save, _req, ...args) => save(...args),
   savePrivateTextErrorTurn: (...args) =>
     jest.requireActual('@librechat/api').savePrivateTextErrorTurn(...args),

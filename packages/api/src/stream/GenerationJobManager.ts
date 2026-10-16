@@ -4951,6 +4951,7 @@ class GenerationJobManagerClass {
               text: jobData.userMessage.text ?? '',
               quotes: jobData.userMessage.quotes,
               privacyRevision: jobData.userMessage.privacyRevision,
+              scheduleRun: jobData.userMessage.scheduleRun,
               isCreatedByUser: true,
             }
           : null,
@@ -4961,6 +4962,7 @@ class GenerationJobManagerClass {
               parentMessageId: userMessageId,
               conversationId: jobData.conversationId,
               content: abortContent,
+              scheduleRun: jobData.userMessage?.scheduleRun,
               sender: jobData.sender ?? 'AI',
               endpoint: jobData.endpoint,
               iconURL: jobData.iconURL,
@@ -8074,6 +8076,7 @@ class GenerationJobManagerClass {
         text: message.text,
         quotes: message.quotes,
         privacyRevision: message.privacyRevision,
+        scheduleRun: message.scheduleRun,
         // Persist the turn's uploaded files so a HITL resume sources them from the job
         // (this authoritative writer), not a user DB row whose save can still be racing
         // the approval prompt.
